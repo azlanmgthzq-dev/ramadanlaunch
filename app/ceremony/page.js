@@ -3,303 +3,243 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion } from 'framer-motion'
 
+/**
+ * Delay-based verse timing (seconds after audio starts)
+ * Adjust these values if audio changes
+ */
+const verseTimings = [
+  { index: 0, start: 5 },   // Bismillah
+  { index: 1, start: 11 },
+  { index: 2, start: 18 },
+  { index: 3, start: 26 },
+  { index: 4, start: 33 },
+  { index: 5, start: 40 },
+  { index: 6, start: 47 }
+]
+
 export default function CeremonyPage() {
-  const [isPlaying, setIsPlaying] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [visibleVerseIndex, setVisibleVerseIndex] = useState(-1)
   const [quranData, setQuranData] = useState({ arabic: [], english: [] })
-  const [audioContextStarted, setAudioContextStarted] = useState(false)
-  
+
   const audioRef = useRef(null)
   const canvasRef = useRef(null)
   const analyserRef = useRef(null)
   const audioContextRef = useRef(null)
   const animationRef = useRef(null)
-  const sourceRef = useRef(null)
 
-  // Fetch Quran data
+  /* ---------------------------------------------------
+     Fetch Quran Data
+  --------------------------------------------------- */
   useEffect(() => {
-    const fetchQuranData = async () => {
+    const fetchQuran = async () => {
       try {
-        const response = await fetch('https://api.alquran.cloud/v1/surah/1/editions/quran-unicode,en.sahih')
-        const data = await response.json()
-        
-        if (data.code === 200 && data.data) {
-          const arabicData = data.data[0]?.ayahs || []
-          const englishData = data.data[1]?.ayahs || []
-          
-          setQuranData({
-            arabic: arabicData,
-            english: englishData
-          })
-        }
-      } catch (error) {
-        console.error('Error fetching Quran data:', error)
+        const res = await fetch(
+          'https://api.alquran.cloud/v1/surah/1/editions/quran-unicode,en.sahih'
+        )
+        const json = await res.json()
+
+        setQuranData({
+          arabic: json.data[0].ayahs,
+          english: json.data[1].ayahs
+        })
+      } catch (e) {
+        console.error(e)
       } finally {
         setLoading(false)
       }
     }
 
-    fetchQuranData()
+    fetchQuran()
   }, [])
 
-  // Initialize audio context and visualizer
+  /* ---------------------------------------------------
+     Audio Context + Visualizer
+  --------------------------------------------------- */
   const initAudioContext = useCallback(() => {
     if (audioContextRef.current || !audioRef.current) return
-    
-    try {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-      audioContextRef.current = audioContext
-      
-      const analyser = audioContext.createAnalyser()
-      analyser.fftSize = 128
-      analyserRef.current = analyser
-      
-      const source = audioContext.createMediaElementSource(audioRef.current)
-      sourceRef.current = source
-      source.connect(analyser)
-      analyser.connect(audioContext.destination)
-      
-      setAudioContextStarted(true)
-    } catch (error) {
-      console.error('Error initializing audio context:', error)
-    }
+
+    const AudioCtx = window.AudioContext || window.webkitAudioContext
+    const ctx = new AudioCtx()
+    audioContextRef.current = ctx
+
+    const analyser = ctx.createAnalyser()
+    analyser.fftSize = 128
+    analyserRef.current = analyser
+
+    const source = ctx.createMediaElementSource(audioRef.current)
+    source.connect(analyser)
+    analyser.connect(ctx.destination)
   }, [])
 
-  // Draw visualizer
-  const draw = useCallback(() => {
+  const drawVisualizer = useCallback(() => {
     if (!canvasRef.current || !analyserRef.current) return
-    
+
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
     const analyser = analyserRef.current
     const bufferLength = analyser.frequencyBinCount
     const dataArray = new Uint8Array(bufferLength)
-    
+
     const render = () => {
       animationRef.current = requestAnimationFrame(render)
       analyser.getByteFrequencyData(dataArray)
-      
+
       ctx.clearRect(0, 0, canvas.width, canvas.height)
-      
       const barWidth = canvas.width / bufferLength
       let x = 0
-      
-      dataArray.forEach((value) => {
-        const height = (value / 255) * canvas.height * 0.9
-        
-        // Create gradient for bars
-        const gradient = ctx.createLinearGradient(0, canvas.height, 0, canvas.height - height)
-        gradient.addColorStop(0, 'rgba(212, 175, 55, 0.3)')
-        gradient.addColorStop(1, 'rgba(212, 175, 55, 0.9)')
-        
-        ctx.fillStyle = gradient
-        ctx.fillRect(x, canvas.height - height, barWidth - 1, height)
+
+      dataArray.forEach((v) => {
+        const h = (v / 255) * canvas.height * 0.9
+        const g = ctx.createLinearGradient(0, canvas.height, 0, canvas.height - h)
+        g.addColorStop(0, 'rgba(212,175,55,0.3)')
+        g.addColorStop(1, 'rgba(212,175,55,0.9)')
+        ctx.fillStyle = g
+        ctx.fillRect(x, canvas.height - h, barWidth - 1, h)
         x += barWidth
       })
     }
-    
+
     render()
   }, [])
 
-  // Auto-play if user interacted on previous screen
-  useEffect(() => {
-    const hasInteracted = typeof window !== 'undefined' && sessionStorage.getItem('userInteracted') === 'true'
-    
-    if (hasInteracted && audioRef.current && !loading) {
-      const tryAutoPlay = async () => {
-        try {
-          initAudioContext()
-          await audioRef.current.play()
-          setIsPlaying(true)
-          draw()
-        } catch (error) {
-          console.log('Auto-play prevented, user interaction required:', error)
-        }
-      }
-      
-      // Small delay to ensure everything is loaded
-      const timer = setTimeout(tryAutoPlay, 500)
-      return () => clearTimeout(timer)
-    }
-  }, [loading, initAudioContext, draw])
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current)
-      }
-      if (audioContextRef.current) {
-        audioContextRef.current.close()
-      }
-    }
-  }, [])
-
-  // Toggle playback
-  const togglePlayback = async () => {
-    if (!audioRef.current) return
-    
-    if (!audioContextStarted) {
-      initAudioContext()
-    }
-    
-    if (audioRef.current.paused) {
-      try {
-        // Resume audio context if suspended
-        if (audioContextRef.current?.state === 'suspended') {
-          await audioContextRef.current.resume()
-        }
-        await audioRef.current.play()
-        setIsPlaying(true)
-        draw()
-      } catch (error) {
-        console.error('Error playing audio:', error)
-      }
-    } else {
-      audioRef.current.pause()
-      setIsPlaying(false)
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current)
-      }
-    }
-  }
-
-  // Handle audio end
+  /* ---------------------------------------------------
+     Verse Sync (Option A)
+  --------------------------------------------------- */
   useEffect(() => {
     const audio = audioRef.current
     if (!audio) return
-    
-    const handleEnded = () => {
-      setIsPlaying(false)
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current)
+
+    const onTimeUpdate = () => {
+      const t = audio.currentTime
+      for (let i = verseTimings.length - 1; i >= 0; i--) {
+        if (t >= verseTimings[i].start) {
+          setVisibleVerseIndex(verseTimings[i].index)
+          break
+        }
       }
     }
-    
-    audio.addEventListener('ended', handleEnded)
-    return () => audio.removeEventListener('ended', handleEnded)
+
+    audio.addEventListener('timeupdate', onTimeUpdate)
+    return () => audio.removeEventListener('timeupdate', onTimeUpdate)
+  }, [])
+
+  /* ---------------------------------------------------
+     Auto play if signed on previous page
+  --------------------------------------------------- */
+  useEffect(() => {
+    const signed = sessionStorage.getItem('userInteracted') === 'true'
+    if (!signed || !audioRef.current || loading) return
+
+    const timer = setTimeout(async () => {
+      try {
+        initAudioContext()
+        await audioRef.current.play()
+        setIsPlaying(true)
+        drawVisualizer()
+      } catch {}
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [loading, initAudioContext, drawVisualizer])
+
+  /* ---------------------------------------------------
+     Toggle Play / Pause
+  --------------------------------------------------- */
+  const togglePlayback = async () => {
+    const audio = audioRef.current
+    if (!audio) return
+
+    if (audio.paused) {
+      if (audio.currentTime === 0) setVisibleVerseIndex(-1)
+      initAudioContext()
+      await audio.play()
+      setIsPlaying(true)
+      drawVisualizer()
+    } else {
+      audio.pause()
+      setIsPlaying(false)
+      cancelAnimationFrame(animationRef.current)
+    }
+  }
+
+  /* ---------------------------------------------------
+     Cleanup
+  --------------------------------------------------- */
+  useEffect(() => {
+    return () => {
+      cancelAnimationFrame(animationRef.current)
+      audioContextRef.current?.close()
+    }
   }, [])
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#050a25]">
-        <p className="text-[#d4af37] text-lg tracking-wide font-playfair">Loading Al-Fatihah…</p>
+        <p className="text-[#d4af37] font-playfair">Loading Al-Fatihah…</p>
       </div>
     )
   }
 
   return (
-    <motion.main
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 1 }}
-      className="relative min-h-screen overflow-hidden"
-    >
-      {/* Background Image */}
-      <div 
-        className="fixed inset-0 bg-cover bg-center bg-no-repeat"
+    <motion.main className="relative min-h-screen overflow-hidden">
+      <div
+        className="fixed inset-0 bg-cover bg-center"
         style={{ backgroundImage: "url('/images/islamic_bg.png')" }}
       />
-      
-      {/* Dark Overlay - cleaner for reading */}
-      <div className="fixed inset-0 bg-gradient-to-b from-[#050a25]/70 via-[#050a25]/50 to-[#050a25]/80" />
+      <div className="fixed inset-0 bg-[#050a25]/75" />
 
-      {/* Hidden Audio Element */}
       <audio ref={audioRef} src="/audio/al-fatihah.mp3" preload="auto" />
 
-      {/* Content */}
-      <div className="relative z-10 min-h-screen flex flex-col items-center py-8 px-4 md:px-8">
-        {/* Header */}
-        <motion.h1
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.2 }}
-          className="font-playfair uppercase text-[#d4af37] text-sm tracking-[0.25em] mb-6"
-        >
-          Ramadan Kareem
-        </motion.h1>
-
-        {/* Play/Pause Button */}
-        <motion.button
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
+      <div className="relative z-10 flex flex-col items-center px-4 py-8">
+        <button
           onClick={togglePlayback}
-          className={`mb-8 px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
-            isPlaying 
-              ? 'bg-[#d4af37] text-[#050a25]' 
-              : 'border border-[#d4af37]/50 text-[#d4af37] hover:bg-[#d4af37]/10'
-          }`}
+          className="mb-8 px-6 py-2 rounded-full border border-[#d4af37] text-[#d4af37]"
         >
           {isPlaying ? 'Pause Recitation' : 'Play Recitation'}
-        </motion.button>
+        </button>
 
-        {/* Quran Display Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.6 }}
-          className="w-full max-w-6xl rounded-3xl border border-[#d4af37]/40 bg-[#050a25]/70 backdrop-blur-md overflow-hidden"
-        >
-          <div className="grid grid-cols-1 lg:grid-cols-2">
-            {/* Translation Column */}
-            <div className="p-6 md:p-8 border-b lg:border-b-0 lg:border-r border-[#d4af37]/25">
-              <h2 className="font-playfair text-[#d4af37] text-xl md:text-2xl text-center mb-6">
-                Translation
-              </h2>
-              <div className="space-y-4">
-                {quranData.english.map((ayah, index) => (
-                  <p key={ayah.number} className="text-gray-100 text-sm md:text-base leading-relaxed">
-                    <span className="text-[#d4af37] font-bold mr-1">{ayah.numberInSurah}.</span>
-                    {ayah.text}
-                  </p>
-                ))}
-              </div>
-            </div>
-
-            {/* Arabic Column */}
-            <div className="p-6 md:p-8" dir="rtl">
-              <h2 className="font-amiri text-[#d4af37] text-xl md:text-2xl text-center mb-6">
-                سورة الفاتحة
-              </h2>
-              <div className="space-y-6">
-                {quranData.arabic.map((ayah, index) => (
-                  <p key={ayah.number} className="font-amiri text-gray-100 text-2xl md:text-3xl leading-loose text-right">
-                    {ayah.text}
-                    <span className="text-[#d4af37] text-sm mr-2">({ayah.numberInSurah})</span>
-                  </p>
-                ))}
-              </div>
-            </div>
+        {/* Quran Card */}
+        <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 bg-[#050a25]/70 border border-[#d4af37]/30 rounded-3xl overflow-hidden">
+          {/* English */}
+          <div className="p-6 border-b lg:border-b-0 lg:border-r border-[#d4af37]/25">
+            {quranData.english.map((a) => (
+              <p key={a.number} className="text-gray-100 text-sm mb-3">
+                <span className="text-[#d4af37] mr-1">{a.numberInSurah}.</span>
+                {a.text}
+              </p>
+            ))}
           </div>
-        </motion.div>
 
-        {/* Audio Visualizer */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.8 }}
-          className="w-full max-w-3xl mt-8"
-        >
-          <div className="rounded-xl border border-[#d4af37]/30 bg-[#050a25]/60 overflow-hidden">
-            <canvas
-              ref={canvasRef}
-              width={800}
-              height={80}
-              className="w-full h-24"
-            />
+          {/* Arabic */}
+          <div className="p-6 space-y-6" dir="rtl">
+            {quranData.arabic.map(
+              (a, i) =>
+                i <= visibleVerseIndex && (
+                  <motion.p
+                    key={a.number}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="font-amiri text-2xl md:text-3xl text-gray-100"
+                  >
+                    {a.text}
+                    <span className="text-[#d4af37] text-sm mr-2">
+                      ({a.numberInSurah})
+                    </span>
+                  </motion.p>
+                )
+            )}
           </div>
-        </motion.div>
+        </div>
 
-        {/* Footer */}
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.8, delay: 1 }}
-          className="mt-8 text-sm text-gray-300 italic"
-        >
-          Officiated by <span className="text-[#d4af37]">Dato&apos; Nonee Ashirin</span>
-        </motion.p>
+        {/* Visualizer */}
+        <canvas
+          ref={canvasRef}
+          width={800}
+          height={80}
+          className="mt-8 w-full max-w-3xl h-24 border border-[#d4af37]/30 bg-[#050a25]/60 rounded-xl"
+        />
       </div>
     </motion.main>
   )

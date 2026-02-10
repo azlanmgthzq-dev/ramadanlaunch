@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
+import { useRef, useEffect, useState } from 'react'
 import SignaturePad from '@/components/SignaturePad'
 
 // Islamic Calligraphy Icon SVG
@@ -44,14 +45,34 @@ const IslamicIcon = () => (
   </svg>
 )
 
+
 export default function HomePage() {
   const router = useRouter()
 
+  const signTimeoutRef = useRef(null)
+  const [isFinishing, setIsFinishing] = useState(false)
+
   const handleSigned = () => {
-    sessionStorage.setItem('userInteracted', 'true')
-    router.push('/ceremony')
+  if (signTimeoutRef.current) {
+    clearTimeout(signTimeoutRef.current)
   }
 
+  setIsFinishing(true) // 👈 show text
+
+  signTimeoutRef.current = setTimeout(() => {
+    sessionStorage.setItem('userInteracted', 'true')
+    router.push('/ceremony')
+  }, 1200)
+}
+
+  useEffect(() => {
+    return () => {
+      if (signTimeoutRef.current) {
+        clearTimeout(signTimeoutRef.current)
+      }
+    }
+  }, [])
+ 
   return (
     <motion.main
       initial={{ opacity: 0 }}
@@ -142,24 +163,34 @@ export default function HomePage() {
         </motion.p>
 
         {/* Signature Pad */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 1.4 }}
-          className="w-full max-w-xl mb-4"
-        >
-          <SignaturePad onComplete={handleSigned} />
-        </motion.div>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, delay: 1.4 }}
+        className="w-full max-w-xl mb-4"
+      >
+        <SignaturePad onComplete={handleSigned} />
+      </motion.div>
 
-        {/* Helper Text */}
+      {/* Helper Text */}
+      <motion.p
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.8, delay: 1.6 }}
+        className="text-[#d4af37]/70 text-xs mt-4"
+      >
+        Sign above using your finger or mouse
+      </motion.p>
+
+      {isFinishing && (
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 0.8, delay: 1.6 }}
-          className="text-[#d4af37]/70 text-xs mt-4"
+          className="text-[#d4af37]/80 text-xs mt-2 italic"
         >
-          Sign above using your finger or mouse
+          Finishing signature…
         </motion.p>
+        )}
       </div>
     </motion.main>
   )
