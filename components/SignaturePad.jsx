@@ -1,40 +1,66 @@
 'use client'
 
-import { useRef, useState, useEffect } from 'react'
-import dynamic from 'next/dynamic'
-
-// Dynamic import to avoid SSR issues with canvas
-const SignatureCanvas = dynamic(
-  () => import('react-signature-canvas'),
-  { ssr: false }
-)
+import { useRef, useState, useEffect, useCallback } from 'react'
+import SignatureCanvas from 'react-signature-canvas'
 
 export default function SignaturePad({ onComplete }) {
   const sigRef = useRef(null)
   const [isEmpty, setIsEmpty] = useState(true)
   const [isTransitioning, setIsTransitioning] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
   const containerRef = useRef(null)
+  const timeoutRef = useRef(null)
 
-  const handleEnd = () => {
-    if (sigRef.current && !sigRef.current.isEmpty()) {
-      setIsEmpty(false)
-      setIsTransitioning(true)
-      
-      // Auto-navigate after brief delay
-      setTimeout(() => {
-        const dataURL = sigRef.current?.toDataURL()
-        if (dataURL) {
-          sessionStorage.setItem('signature', dataURL)
-        }
-        onComplete()
-      }, 400)
+  useEffect(() => {
+    setIsMounted(true)
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
     }
-  }
+  }, [])
 
-  const handleClear = () => {
-    sigRef.current?.clear()
+  const handleEnd = useCallback(() => {
+    // Check if signature canvas has data
+    if (sigRef.current) {
+      const isEmpty = sigRef.current.isEmpty()
+      if (!isEmpty) {
+        setIsEmpty(false)
+        setIsTransitioning(true)
+        
+        // Auto-navigate after brief delay
+        timeoutRef.current = setTimeout(() => {
+          try {
+            const dataURL = sigRef.current?.toDataURL()
+            if (dataURL) {
+              sessionStorage.setItem('signature', dataURL)
+            }
+          } catch (e) {
+            console.log('Could not save signature')
+          }
+          onComplete()
+        }, 400)
+      }
+    }
+  }, [onComplete])
+
+  const handleClear = useCallback(() => {
+    if (sigRef.current) {
+      sigRef.current.clear()
+    }
     setIsEmpty(true)
     setIsTransitioning(false)
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+    }
+  }, [])
+
+  if (!isMounted) {
+    return (
+      <div className="space-y-4 w-full max-w-xl mx-auto">
+        <div className="relative rounded-2xl border-2 border-[#d4af37]/40 bg-white/5 backdrop-blur-sm overflow-hidden h-48" />
+      </div>
+    )
   }
 
   return (
