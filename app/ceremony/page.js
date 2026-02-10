@@ -64,7 +64,7 @@ export default function CeremonyPage() {
           return prev + 1
         })
       }, 5000)
-    }, 6000)
+    }, 6500)
 
     return () => {
       clearTimeout(timeoutId)
