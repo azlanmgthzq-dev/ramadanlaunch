@@ -3,20 +3,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion } from 'framer-motion'
 
-/**
- * Delay-based verse timing (seconds after audio starts)
- * Adjust these values if audio changes
- */
-const verseTimings = [
-  { index: 0, start: 5 },   // Bismillah
-  { index: 1, start: 11 },
-  { index: 2, start: 18 },
-  { index: 3, start: 26 },
-  { index: 4, start: 33 },
-  { index: 5, start: 40 },
-  { index: 6, start: 47 }
-]
-
 export default function CeremonyPage() {
   const [loading, setLoading] = useState(true)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -53,6 +39,38 @@ export default function CeremonyPage() {
 
     fetchQuran()
   }, [])
+
+  /* ---------------------------------------------------
+     Progressive Verse Reveal
+     - First verse appears after 9 seconds
+     - Each subsequent verse appears every 5 seconds
+  --------------------------------------------------- */
+  useEffect(() => {
+    if (quranData.arabic.length === 0) return
+
+    let intervalId
+
+    // Show first verse after 9 seconds
+    const timeoutId = setTimeout(() => {
+      setVisibleVerseIndex(0)
+
+      // Show next verses every 5 seconds
+      intervalId = setInterval(() => {
+        setVisibleVerseIndex((prev) => {
+          if (prev + 1 >= quranData.arabic.length) {
+            clearInterval(intervalId)
+            return prev
+          }
+          return prev + 1
+        })
+      }, 5000)
+    }, 9000)
+
+    return () => {
+      clearTimeout(timeoutId)
+      if (intervalId) clearInterval(intervalId)
+    }
+  }, [quranData.arabic.length])
 
   /* ---------------------------------------------------
      Audio Context + Visualizer
@@ -105,27 +123,6 @@ export default function CeremonyPage() {
   }, [])
 
   /* ---------------------------------------------------
-     Verse Sync (Option A)
-  --------------------------------------------------- */
-  useEffect(() => {
-    const audio = audioRef.current
-    if (!audio) return
-
-    const onTimeUpdate = () => {
-      const t = audio.currentTime
-      for (let i = verseTimings.length - 1; i >= 0; i--) {
-        if (t >= verseTimings[i].start) {
-          setVisibleVerseIndex(verseTimings[i].index)
-          break
-        }
-      }
-    }
-
-    audio.addEventListener('timeupdate', onTimeUpdate)
-    return () => audio.removeEventListener('timeupdate', onTimeUpdate)
-  }, [])
-
-  /* ---------------------------------------------------
      Auto play if signed on previous page
   --------------------------------------------------- */
   useEffect(() => {
@@ -152,8 +149,10 @@ export default function CeremonyPage() {
     if (!audio) return
 
     if (audio.paused) {
-      if (audio.currentTime === 0) setVisibleVerseIndex(-1)
       initAudioContext()
+      if (audioContextRef.current?.state === 'suspended') {
+        await audioContextRef.current.resume()
+      }
       await audio.play()
       setIsPlaying(true)
       drawVisualizer()
@@ -163,6 +162,24 @@ export default function CeremonyPage() {
       cancelAnimationFrame(animationRef.current)
     }
   }
+
+  /* ---------------------------------------------------
+     Handle audio end
+  --------------------------------------------------- */
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio) return
+
+    const handleEnded = () => {
+      setIsPlaying(false)
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current)
+      }
+    }
+
+    audio.addEventListener('ended', handleEnded)
+    return () => audio.removeEventListener('ended', handleEnded)
+  }, [])
 
   /* ---------------------------------------------------
      Cleanup
@@ -177,69 +194,141 @@ export default function CeremonyPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#050a25]">
-        <p className="text-[#d4af37] font-playfair">Loading Al-Fatihah…</p>
+        <p className="text-[#d4af37] font-playfair text-lg tracking-wide">Loading Al-Fatihah…</p>
       </div>
     )
   }
 
   return (
-    <motion.main className="relative min-h-screen overflow-hidden">
+    <motion.main
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 1 }}
+      className="relative min-h-screen overflow-hidden"
+    >
+      {/* Background Image */}
       <div
-        className="fixed inset-0 bg-cover bg-center"
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: "url('/images/islamic_bg.png')" }}
       />
-      <div className="fixed inset-0 bg-[#050a25]/75" />
 
+      {/* Dark Overlay */}
+      <div className="fixed inset-0 bg-gradient-to-b from-[#050a25]/70 via-[#050a25]/50 to-[#050a25]/80" />
+
+      {/* Hidden Audio Element */}
       <audio ref={audioRef} src="/audio/al-fatihah.mp3" preload="auto" />
 
-      <div className="relative z-10 flex flex-col items-center px-4 py-8">
-        <button
+      {/* Content */}
+      <div className="relative z-10 min-h-screen flex flex-col items-center py-8 px-4 md:px-8">
+        {/* Header */}
+        <motion.h1
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.2 }}
+          className="font-playfair uppercase text-[#d4af37] text-sm tracking-[0.25em] mb-6"
+        >
+          Ramadan Kareem
+        </motion.h1>
+
+        {/* Play/Pause Button */}
+        <motion.button
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, delay: 0.4 }}
           onClick={togglePlayback}
-          className="mb-8 px-6 py-2 rounded-full border border-[#d4af37] text-[#d4af37]"
+          className={`mb-8 px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
+            isPlaying
+              ? 'bg-[#d4af37] text-[#050a25]'
+              : 'border border-[#d4af37]/50 text-[#d4af37] hover:bg-[#d4af37]/10'
+          }`}
         >
           {isPlaying ? 'Pause Recitation' : 'Play Recitation'}
-        </button>
+        </motion.button>
 
-        {/* Quran Card */}
-        <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 bg-[#050a25]/70 border border-[#d4af37]/30 rounded-3xl overflow-hidden">
-          {/* English */}
-          <div className="p-6 border-b lg:border-b-0 lg:border-r border-[#d4af37]/25">
-            {quranData.english.map((a) => (
-              <p key={a.number} className="text-gray-100 text-sm mb-3">
-                <span className="text-[#d4af37] mr-1">{a.numberInSurah}.</span>
-                {a.text}
-              </p>
-            ))}
+        {/* Quran Display Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.6 }}
+          className="w-full max-w-6xl rounded-3xl border border-[#d4af37]/40 bg-[#050a25]/70 backdrop-blur-md overflow-hidden"
+        >
+          <div className="grid grid-cols-1 lg:grid-cols-2">
+            {/* Translation Column */}
+            <div className="p-6 md:p-8 border-b lg:border-b-0 lg:border-r border-[#d4af37]/25">
+              <h2 className="font-playfair text-[#d4af37] text-xl md:text-2xl text-center mb-6">
+                Translation
+              </h2>
+              <div className="space-y-4">
+                {quranData.english.map((ayah, index) => (
+                  index <= visibleVerseIndex && (
+                    <motion.p
+                      key={ayah.number}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.8 }}
+                      className="text-gray-100 text-sm md:text-base leading-relaxed"
+                    >
+                      <span className="text-[#d4af37] font-bold mr-1">
+                        {ayah.numberInSurah}.
+                      </span>
+                      {ayah.text}
+                    </motion.p>
+                  )
+                ))}
+              </div>
+            </div>
+
+            {/* Arabic Column */}
+            <div className="p-6 md:p-8" dir="rtl">
+              <h2 className="font-amiri text-[#d4af37] text-xl md:text-2xl text-center mb-6">
+                سورة الفاتحة
+              </h2>
+              <div className="space-y-6">
+                {quranData.arabic.map((ayah, index) => (
+                  index <= visibleVerseIndex && (
+                    <motion.p
+                      key={ayah.number}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.8 }}
+                      className="font-amiri text-gray-100 text-2xl md:text-3xl leading-loose text-right"
+                    >
+                      {ayah.text}
+                      <span className="text-[#d4af37] text-sm mr-2">({ayah.numberInSurah})</span>
+                    </motion.p>
+                  )
+                ))}
+              </div>
+            </div>
           </div>
+        </motion.div>
 
-          {/* Arabic */}
-          <div className="p-6 space-y-6" dir="rtl">
-            {quranData.arabic.map(
-              (a, i) =>
-                i <= visibleVerseIndex && (
-                  <motion.p
-                    key={a.number}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="font-amiri text-2xl md:text-3xl text-gray-100"
-                  >
-                    {a.text}
-                    <span className="text-[#d4af37] text-sm mr-2">
-                      ({a.numberInSurah})
-                    </span>
-                  </motion.p>
-                )
-            )}
+        {/* Audio Visualizer */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.8 }}
+          className="w-full max-w-3xl mt-8"
+        >
+          <div className="rounded-xl border border-[#d4af37]/30 bg-[#050a25]/60 overflow-hidden">
+            <canvas
+              ref={canvasRef}
+              width={800}
+              height={80}
+              className="w-full h-24"
+            />
           </div>
-        </div>
+        </motion.div>
 
-        {/* Visualizer */}
-        <canvas
-          ref={canvasRef}
-          width={800}
-          height={80}
-          className="mt-8 w-full max-w-3xl h-24 border border-[#d4af37]/30 bg-[#050a25]/60 rounded-xl"
-        />
+        {/* Footer */}
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.8, delay: 1 }}
+          className="mt-8 text-sm text-gray-300 italic"
+        >
+          Officiated by <span className="text-[#d4af37]">Dato&apos; Nonee Ashirin</span>
+        </motion.p>
       </div>
     </motion.main>
   )
