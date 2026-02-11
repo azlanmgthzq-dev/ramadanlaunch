@@ -227,7 +227,8 @@ export default function CeremonyPage() {
           transition={{ duration: 0.8, delay: 0.2 }}
           className="font-playfair uppercase text-[#d4af37] text-sm tracking-[0.25em] mb-6"
         >
-          Ramadan Kareem
+         
+        "Hearts United by the  Al-Quran”
         </motion.h1>
 
         {/* Play/Pause Button */}

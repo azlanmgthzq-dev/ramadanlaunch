@@ -1,112 +1,137 @@
 'use client'
 
-import { useRef, useState, useEffect, useCallback } from 'react'
-import SignatureCanvas from 'react-signature-canvas'
+import { useRef, useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
 
-export default function SignaturePad({ onComplete }) {
-  const sigRef = useRef(null)
+export default function SignaturePad({ onComplete, onSigningStart }) {
+  const canvasRef = useRef(null)
+  const [isDrawing, setIsDrawing] = useState(false)
+  const [hasStarted, setHasStarted] = useState(false)
   const [isEmpty, setIsEmpty] = useState(true)
-  const [isTransitioning, setIsTransitioning] = useState(false)
-  const [isMounted, setIsMounted] = useState(false)
-  const containerRef = useRef(null)
-  const timeoutRef = useRef(null)
 
   useEffect(() => {
-    setIsMounted(true)
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
-      }
-    }
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    // Set canvas size
+    const rect = canvas.getBoundingClientRect()
+    canvas.width = rect.width * 2
+    canvas.height = rect.height * 2
+    ctx.scale(2, 2)
+
+    // Style
+    ctx.strokeStyle = '#d4af37'
+    ctx.lineWidth = 2
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
   }, [])
 
-  const handleEnd = useCallback(() => {
-    // Check if signature canvas has data
-    if (sigRef.current) {
-      const isEmpty = sigRef.current.isEmpty()
-      if (!isEmpty) {
-        setIsEmpty(false)
-        setIsTransitioning(true)
-        
-        // Auto-navigate after brief delay
-        timeoutRef.current = setTimeout(() => {
-          try {
-            const dataURL = sigRef.current?.toDataURL()
-            if (dataURL) {
-              sessionStorage.setItem('signature', dataURL)
-            }
-          } catch (e) {
-            console.log('Could not save signature')
-          }
-          onComplete()
-        }, 400)
-      }
-    }
-  }, [onComplete])
+  const startDrawing = (e) => {
+    const canvas = canvasRef.current
+    if (!canvas) return
 
-  const handleClear = useCallback(() => {
-    if (sigRef.current) {
-      sigRef.current.clear()
+    // 🎯 Trigger effects on first stroke
+    if (!hasStarted && onSigningStart) {
+      onSigningStart()
+      setHasStarted(true)
     }
+
+    setIsDrawing(true)
+    setIsEmpty(false)
+
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const rect = canvas.getBoundingClientRect()
+    const x = e.touches ? e.touches[0].clientX - rect.left : e.clientX - rect.left
+    const y = e.touches ? e.touches[0].clientY - rect.top : e.clientY - rect.top
+
+    ctx.beginPath()
+    ctx.moveTo(x, y)
+  }
+
+  const draw = (e) => {
+    if (!isDrawing) return
+
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const rect = canvas.getBoundingClientRect()
+    const x = e.touches ? e.touches[0].clientX - rect.left : e.clientX - rect.left
+    const y = e.touches ? e.touches[0].clientY - rect.top : e.clientY - rect.top
+
+    ctx.lineTo(x, y)
+    ctx.stroke()
+  }
+
+  const stopDrawing = () => {
+    setIsDrawing(false)
+  }
+
+  const clearSignature = () => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
     setIsEmpty(true)
-    setIsTransitioning(false)
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current)
-    }
-  }, [])
+    setHasStarted(false)
+  }
 
-  if (!isMounted) {
-    return (
-      <div className="space-y-4 w-full max-w-xl mx-auto">
-        <div className="relative rounded-2xl border-2 border-[#d4af37]/40 bg-white/5 backdrop-blur-sm overflow-hidden h-48" />
-      </div>
-    )
+  const handleConfirm = () => {
+    if (!isEmpty) {
+      onComplete()
+    }
   }
 
   return (
-    <div className="space-y-4 w-full max-w-xl mx-auto">
-      <div 
-        ref={containerRef}
-        className={`relative rounded-2xl border-2 border-[#d4af37]/40 bg-white/5 backdrop-blur-sm overflow-hidden transition-all duration-300 ${isTransitioning ? 'scale-105 border-[#d4af37]/80 shadow-lg shadow-[#d4af37]/20' : ''}`}
-      >
-        <SignatureCanvas
-          ref={sigRef}
-          onEnd={handleEnd}
-          canvasProps={{
-            className: 'w-full h-48 cursor-crosshair',
-            style: { touchAction: 'none' }
-          }}
-          penColor="#d4af37"
-          backgroundColor="transparent"
-          minWidth={0.5}
-          maxWidth={2.5}
+    <div className="w-full">
+      <div className="relative border-2 border-[#d4af37]/30 rounded-lg bg-white/5 backdrop-blur-sm">
+        <canvas
+          ref={canvasRef}
+          onMouseDown={startDrawing}
+          onMouseMove={draw}
+          onMouseUp={stopDrawing}
+          onMouseLeave={stopDrawing}
+          onTouchStart={startDrawing}
+          onTouchMove={draw}
+          onTouchEnd={stopDrawing}
+          className="w-full h-40 md:h-48 cursor-crosshair touch-none"
         />
-        
-        {/* Subtle corner decorations */}
-        <div className="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-[#d4af37]/30 rounded-tl" />
-        <div className="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-[#d4af37]/30 rounded-tr" />
-        <div className="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-[#d4af37]/30 rounded-bl" />
-        <div className="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-[#d4af37]/30 rounded-br" />
       </div>
 
-      {!isEmpty && !isTransitioning && (
-        <div className="flex justify-center">
-          <button
-            onClick={handleClear}
-            className="px-5 py-1.5 rounded-full border border-[#d4af37]/50 text-[#d4af37] text-sm hover:bg-[#d4af37]/10 transition-all"
-          >
-            Clear
-          </button>
-        </div>
-      )}
-      
-      {isTransitioning && (
-        <div className="flex justify-center">
-          <span className="text-[#d4af37]/80 text-sm animate-pulse">
-            Proceeding to ceremony...
-          </span>
-        </div>
-      )}
+      <div className="flex gap-4 justify-center mt-4">
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={clearSignature}
+          className="px-6 py-2 text-sm text-[#d4af37] border border-[#d4af37]/50 rounded-md hover:bg-[#d4af37]/10 transition-colors"
+        >
+          Clear
+        </motion.button>
+
+        <motion.button
+          whileHover={{ scale: isEmpty ? 1 : 1.05 }}
+          whileTap={{ scale: isEmpty ? 1 : 0.95 }}
+          onClick={handleConfirm}
+          disabled={isEmpty}
+          className={`px-6 py-2 text-sm rounded-md transition-colors ${
+            isEmpty
+              ? 'bg-[#d4af37]/20 text-[#d4af37]/40 cursor-not-allowed'
+              : 'bg-[#d4af37] text-[#1a1a1a] hover:bg-[#d4af37]/90'
+          }`}
+        >
+          Confirm Signature
+        </motion.button>
+      </div>
     </div>
   )
 }
