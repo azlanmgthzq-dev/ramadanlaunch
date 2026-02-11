@@ -126,20 +126,28 @@ export default function CeremonyPage() {
      Auto play if signed on previous page
   --------------------------------------------------- */
   useEffect(() => {
-    const signed = sessionStorage.getItem('userInteracted') === 'true'
-    if (!signed || !audioRef.current || loading) return
+  const signed = sessionStorage.getItem('userInteracted') === 'true'
+  if (!signed || !audioRef.current || loading) return
 
-    const timer = setTimeout(async () => {
-      try {
-        initAudioContext()
-        await audioRef.current.play()
-        setIsPlaying(true)
-        drawVisualizer()
-      } catch {}
-    }, 500)
+  const startAudio = async () => {
+    try {
+      initAudioContext()
 
-    return () => clearTimeout(timer)
-  }, [loading, initAudioContext, drawVisualizer])
+      if (audioContextRef.current?.state === 'suspended') {
+        await audioContextRef.current.resume()
+      }
+
+      await audioRef.current.play()
+      setIsPlaying(true)
+      drawVisualizer()
+    } catch (err) {
+      console.log('Autoplay blocked')
+    }
+  }
+
+  startAudio()
+}, [loading, initAudioContext, drawVisualizer])
+
 
   /* ---------------------------------------------------
      Toggle Play / Pause
