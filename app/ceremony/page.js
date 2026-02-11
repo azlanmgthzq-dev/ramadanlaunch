@@ -233,7 +233,7 @@ export default function CeremonyPage() {
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.2 }}
-          className="font-playfair uppercase text-[#d4af37] text-sm tracking-[0.25em] mb-6"
+          className="font-playfair uppercase text-[#d4af37] text-2xl tracking-[0.25em] mb-6"
         >
          
         "Hearts United by the  Al-Quran”
