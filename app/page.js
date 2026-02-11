@@ -56,6 +56,8 @@ export default function HomePage() {
 
       // Save to session
       sessionStorage.setItem('ceremonyScreenshot', image)
+      // ✅ Set flag for autoplay on next page
+      sessionStorage.setItem('userInteracted', 'true')
 
       // 📥 Auto download
       const link = document.createElement('a')
@@ -96,14 +98,14 @@ export default function HomePage() {
 
         {/* Content wrapper */}
         <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-6 md:px-12 py-8 text-center">
-          <h1 className="font-playfair text-[#d4af37] text-4xl md:text-6xl leading-tight mb-10">
+          <h1 className="font-playfair text-[#d4af37] text-4xl md:text-6xl leading-tight mb-4">
             Ramadan Reflection Through <br />
             Tadarus Al-Quran
           </h1>
 
-          {/* <p className="font-playfair italic text-[#d4af37]/80 text-xl mb-6">
+          <p className="font-playfair italic text-[#d4af37]/80 text-xl mb-6">
             "Hearts United by the Al-Quran"
-          </p> */}
+          </p>
 
           <div className="mb-8">
             <h2 className="font-playfair text-[#d4af37] text-xl md:text-2xl">
