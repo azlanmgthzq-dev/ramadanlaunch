@@ -87,7 +87,7 @@ export default function HomePage() {
       />
       
       {/* Dark Overlay */}
-      <div className="fixed inset-0 bg-gradient-to-b from-[#0a0e27]/60 via-[#0a0e27]/40 to-[#1a1f3a]/60" />
+      {/* <div className="fixed inset-0 bg-gradient-to-b from-[#0a0e27]/15 via-[#0a0e27]/40 to-[#1a1f3a]/15" /> */}
       
       {/* Particle Animation Layer */}
       <div className="fixed inset-0 particles opacity-30" />
@@ -108,14 +108,14 @@ export default function HomePage() {
         </motion.p>
 
         {/* Islamic Calligraphy Icon */}
-        <motion.div
+        {/* <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.8, delay: 0.4 }}
           className="mb-6"
         >
           <IslamicIcon />
-        </motion.div>
+        </motion.div> */}
 
         {/* Main Title */}
         <motion.div

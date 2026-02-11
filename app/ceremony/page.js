@@ -213,7 +213,7 @@ export default function CeremonyPage() {
       />
 
       {/* Dark Overlay */}
-      <div className="fixed inset-0 bg-gradient-to-b from-[#050a25]/70 via-[#050a25]/50 to-[#050a25]/80" />
+      <div className="fixed inset-0 bg-gradient-to-b from-[#050a25]/15 via-[#050a25]/50 to-[#050a25]/15" />
 
       {/* Hidden Audio Element */}
       <audio ref={audioRef} src="/audio/al-fatihah.mp3" preload="auto" />
