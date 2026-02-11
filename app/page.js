@@ -102,7 +102,7 @@ export default function HomePage() {
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.2 }}
-          className="font-playfair uppercase text-[#d4af37] text-sm tracking-[0.3em] mb-4"
+          className="font-playfair uppercase text-[#d4af37] text-2xl tracking-[0.3em] mb-4"
         >
           Global Turbine Asia Presents
         </motion.p>
@@ -137,7 +137,7 @@ export default function HomePage() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.8, delay: 0.8 }}
-          className="font-playfair italic text-[#d4af37]/80 text-base mb-6"
+          className="font-playfair italic text-[#d4af37]/80 text-xl text-base mb-6"
         >
           Wishing you a blessed and reflective Ramadan
         </motion.p>
