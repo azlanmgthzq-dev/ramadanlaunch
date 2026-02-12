@@ -58,12 +58,6 @@ export default function HomePage() {
       sessionStorage.setItem('ceremonyScreenshot', image)
       // ✅ Set flag for autoplay on next page
       sessionStorage.setItem('userInteracted', 'true')
-
-      // 📥 Auto download
-      const link = document.createElement('a')
-      link.href = image
-      link.download = 'ramadan-ceremony.png'
-      link.click()
     }
 
     // 🚀 Navigate
